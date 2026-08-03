@@ -1,0 +1,19 @@
+Effect(ShadowMapRenderSL)
+{
+	FixedFunc()
+	{
+		Pass(1)
+		{
+			ColorOp0(Mod);
+			AlphaOp0(Mod);
+		}
+	}
+	Shader()
+	{
+		Pass()
+		{
+			VertexShader(ShadowMap);
+			PixelShader(ShadowMapSL);
+		}
+	}
+}
