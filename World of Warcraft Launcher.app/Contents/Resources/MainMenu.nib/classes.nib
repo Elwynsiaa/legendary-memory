@@ -1,0 +1,84 @@
+{
+    IBClasses = (
+        {CLASS = FirstResponder; LANGUAGE = ObjC; SUPERCLASS = NSObject; }, 
+        {
+            ACTIONS = {
+                backgroundModeChanged = id; 
+                backgroundModeRadioClicked = id; 
+                downloadDialogDownloadButtonClicked = id; 
+                downloadDialogInstallFromCDButtonClicked = id; 
+                myAction = id; 
+                optionsButtonClicked = id; 
+                optionsDialogCancelButtonClicked = id; 
+                optionsDialogOKButtonClicked = id; 
+                optionsDialogRestoreButtonClicked = id; 
+                playButtonClicked = id; 
+                ptrButtonClicked = id; 
+                reload = id; 
+                showAboutPanel = id; 
+                supportButtonClicked = id; 
+            }; 
+            CLASS = LauncherController; 
+            LANGUAGE = ObjC; 
+            OUTLETS = {
+                bgCheckboxAfterExiting = NSButton; 
+                bgCheckboxFullSpeed = NSButton; 
+                bgCheckboxWhilePlaying = NSButton; 
+                bgFullSpeedInfo = NSTextField; 
+                bgOptionsInfo = NSTextField; 
+                bgRadioNoBackground = NSButton; 
+                bgRadioUntilComplete = NSButton; 
+                bgRadioWhileNotPlaying = NSButton; 
+                bgRadioWhilePlaying = NSButton; 
+                bottomBackground = NSImageView; 
+                downloadDialog = NSWindow; 
+                downloadPlaceholder = id; 
+                langaugeBox = NSBox; 
+                languageInfo = NSTextField; 
+                languageLabel = NSTextField; 
+                languagePopup = NSPopUpButton; 
+                launcherPlaceholder = NSImageView; 
+                launcherWindow = NSWindow; 
+                menuAbout = NSMenuItem; 
+                menuBringAllToFront = NSMenuItem; 
+                menuClose = NSMenuItem; 
+                menuCopy = NSMenuItem; 
+                menuCut = NSMenuItem; 
+                menuDelete = NSMenuItem; 
+                menuEdit = NSMenuItem; 
+                menuHide = NSMenuItem; 
+                menuHideOthers = NSMenuItem; 
+                menuMinimize = NSMenuItem; 
+                menuPaste = NSMenuItem; 
+                menuQuit = NSMenuItem; 
+                menuRedo = NSMenuItem; 
+                menuSelectAll = NSMenuItem; 
+                menuServices = NSMenuItem; 
+                menuShowAll = NSMenuItem; 
+                menuUndo = NSMenuItem; 
+                menuWindow = NSMenuItem; 
+                menuZoom = NSMenuItem; 
+                moreinfo = URLButton; 
+                optionsButton = NSButton; 
+                optionsDialog = NSWindow; 
+                patchInformationalText = NSTextField; 
+                playButton = NSButton; 
+                publicTestButton = NSButton; 
+                restoreDefaultsButton = NSButton; 
+                statusView = NSTextField; 
+                supportButton = NSButton; 
+                webView = WebView; 
+            }; 
+            SUPERCLASS = NSObject; 
+        }, 
+        {CLASS = LauncherPopupButton; LANGUAGE = ObjC; SUPERCLASS = NSPopUpButton; }, 
+        {
+            CLASS = LauncherPopupButtonCell; 
+            LANGUAGE = ObjC; 
+            SUPERCLASS = NSPopUpButtonCell; 
+        }, 
+        {CLASS = RolloverImageButton; LANGUAGE = ObjC; SUPERCLASS = NSButton; }, 
+        {CLASS = URLButton; LANGUAGE = ObjC; SUPERCLASS = NSButton; }
+    ); 
+    IBVersion = 1; 
+}
