@@ -39,6 +39,7 @@
             cursor: pointer;
         }
 
+        /* Buttons */
         .btn-preview {
             background-color: #28a745; color: white !important;
             padding: 2px 8px; border-radius: 4px; font-size: 0.8em;
@@ -46,6 +47,12 @@
         }
         .btn-preview:hover { background-color: #218838; text-decoration: none !important; }
 
+        .btn-audio {
+            background-color: #6f42c1; color: white !important;
+        }
+        .btn-audio:hover { background-color: #5a32a3; }
+
+        /* Modal Popup Styles */
         .modal {
             display: none; position: fixed; z-index: 9999;
             left: 0; top: 0; width: 100%; height: 100%;
@@ -62,11 +69,13 @@
         }
         .close-btn:hover { color: #000; }
         #canvasContainer {
-            width: 100%; min-height: 250px; background: #1e1e1e;
+            width: 100%; min-height: 150px; background: #1e1e1e;
             display: flex; justify-content: center; align-items: center;
-            border-radius: 4px; overflow: hidden; margin-top: 10px; padding: 10px;
+            border-radius: 4px; overflow: hidden; margin-top: 10px; padding: 20px;
+            box-sizing: border-box;
         }
         canvas { max-width: 100%; max-height: 500px; }
+        audio { width: 90%; }
 
         #progressContainer { margin-bottom: 20px; padding: 15px; background: #f1f8ff; border: 1px solid #c8e1ff; border-radius: 6px; }
         #statusText { font-weight: bold; color: #0366d6; margin-bottom: 8px; }
@@ -77,7 +86,7 @@
 <body>
 
 <div class="container">
-    <h1>Index of /World of Warcraft (3.3.5a)</h1>
+    <h1>World of Warcraft 3.3.5a Asset Explorer</h1>
     
     <div id="progressContainer">
         <div id="statusText">Connecting to index...</div>
@@ -104,19 +113,22 @@
     </table>
 </div>
 
+<!-- Modal Popup -->
 <div id="previewModal" class="modal">
     <div class="modal-content">
         <span class="close-btn" onclick="closeModal()">&times;</span>
-        <h3 id="modalTitle">Texture Preview</h3>
-        <div id="modalLoading" style="color: #666;">Decoding BLP...</div>
+        <h3 id="modalTitle">Preview</h3>
+        <div id="modalLoading" style="color: #666;">Loading...</div>
         <div id="canvasContainer"></div>
     </div>
 </div>
 
 <script>
+// Base raw URL for fetching binary files
 const RAW_REPO_URL = 'https://raw.githubusercontent.com/Elwynsiaa/wow-3.3.5a-asset-explorer/main/';
 let dataTableInstance = null;
 
+// Native BLP Texture Decoder
 class BLPDecoder {
     static parse(buffer) {
         const u32 = new Uint32Array(buffer, 0, 20);
@@ -224,7 +236,7 @@ class BLPDecoder {
     }
 }
 
-// Custom Extension Search Filter Hook
+// DataTables Custom Extension Filter
 $.fn.dataTable.ext.search.push(
     function( settings, data, dataIndex, rowData ) {
         var selectedExt = $('#extensionFilter').val();
@@ -257,7 +269,6 @@ $(document).ready(function() {
             setTimeout(function() {
                 var jsonData = JSON.parse(xhr.responseText);
 
-                // Auto-detect unique extensions
                 let extensions = new Set();
                 jsonData.forEach(item => {
                     let parts = item.N.split('.');
@@ -266,7 +277,6 @@ $(document).ready(function() {
                     }
                 });
 
-                // Populate dropdown
                 let $select = $('#extensionFilter');
                 Array.from(extensions).sort().forEach(ext => {
                     $select.append(`<option value="${ext}">.${ext}</option>`);
@@ -284,8 +294,14 @@ $(document).ready(function() {
                                     let fullFileUrl = RAW_REPO_URL + row.P;
                                     let html = '<a href="' + fullFileUrl + '" target="_blank">' + row.N + '</a>';
                                     let ext = row.N.split('.').pop().toLowerCase();
+                                    
+                                    // BLP Preview Button
                                     if (ext === 'blp') {
-                                        html += ` <a class="btn-preview" onclick="openPreview('${fullFileUrl}', '${row.N}')">👁️ Preview</a>`;
+                                        html += ` <a class="btn-preview" onclick="openPreview('${fullFileUrl}', '${row.N}', 'blp')">👁️ Preview</a>`;
+                                    } 
+                                    // Audio Listen Button (WAV, MP3, OGG)
+                                    else if (ext === 'wav' || ext === 'mp3' || ext === 'ogg') {
+                                        html += ` <a class="btn-preview btn-audio" onclick="openPreview('${fullFileUrl}', '${row.N}', 'audio')">▶️ Listen</a>`;
                                     }
                                     return html;
                                 }
@@ -303,7 +319,6 @@ $(document).ready(function() {
                         "order": [[ 1, "asc" ]]
                     });
 
-                    // Trigger DataTables redraw when extension changes
                     $('#extensionFilter').on('change', function() {
                         dataTableInstance.draw();
                     });
@@ -314,32 +329,50 @@ $(document).ready(function() {
     xhr.send();
 });
 
-function openPreview(fileUrl, fileName) {
+// Modal Controller for Both Textures and Audio
+function openPreview(fileUrl, fileName, type) {
     $('#previewModal').show();
     $('#modalTitle').text(fileName);
     $('#modalLoading').show();
     $('#canvasContainer').empty();
 
-    fetch(fileUrl)
-        .then(res => res.arrayBuffer())
-        .then(buffer => {
-            $('#modalLoading').hide();
-            const blp = BLPDecoder.parse(buffer);
-            const canvas = document.createElement('canvas');
-            canvas.width = blp.width; canvas.height = blp.height;
-            const ctx = canvas.getContext('2d');
-            const imgData = ctx.createImageData(blp.width, blp.height);
-            imgData.data.set(blp.data);
-            ctx.putImageData(imgData, 0, 0);
-            $('#canvasContainer').append(canvas);
-        })
-        .catch(err => {
-            $('#modalLoading').text('Failed to decode BLP texture.').css('color', 'red');
-        });
+    if (type === 'blp') {
+        fetch(fileUrl)
+            .then(res => res.arrayBuffer())
+            .then(buffer => {
+                $('#modalLoading').hide();
+                const blp = BLPDecoder.parse(buffer);
+                const canvas = document.createElement('canvas');
+                canvas.width = blp.width; canvas.height = blp.height;
+                const ctx = canvas.getContext('2d');
+                const imgData = ctx.createImageData(blp.width, blp.height);
+                imgData.data.set(blp.data);
+                ctx.putImageData(imgData, 0, 0);
+                $('#canvasContainer').append(canvas);
+            })
+            .catch(err => {
+                $('#modalLoading').text('Failed to decode BLP texture.').css('color', 'red');
+            });
+    } else if (type === 'audio') {
+        $('#modalLoading').hide();
+        
+        // HTML5 Audio Player
+        const audioPlayer = `<audio controls autoplay>
+                                <source src="${fileUrl}">
+                                Your browser does not support the audio element.
+                             </audio>`;
+        $('#canvasContainer').append(audioPlayer);
+    }
 }
 
+// Close Modal & Stop Audio Playback
 function closeModal() {
     $('#previewModal').hide();
+    
+    // Stop playing audio when modal is closed
+    $('#canvasContainer find("audio")').each(function() {
+        this.pause();
+    });
     $('#canvasContainer').empty();
 }
 </script>
