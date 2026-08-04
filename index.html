@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WoW 3.3.5a File Browser</title>
     
-    <!-- jQuery & DataTables -->
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -85,6 +84,9 @@
 </div>
 
 <script>
+// Base raw URL for streaming binary files directly from your repository
+const RAW_REPO_URL = 'https://raw.githubusercontent.com/Elwynsiaa/legendary-memory/main/';
+
 class BLPDecoder {
     static parse(buffer) {
         const u32 = new Uint32Array(buffer, 0, 20);
@@ -216,10 +218,11 @@ $(document).ready(function() {
                             { 
                                 "data": null,
                                 "render": function ( data, type, row ) {
-                                    let html = '<a href="' + row.P + '" target="_blank">' + row.N + '</a>';
+                                    let fullFileUrl = RAW_REPO_URL + row.P;
+                                    let html = '<a href="' + fullFileUrl + '" target="_blank">' + row.N + '</a>';
                                     let ext = row.N.split('.').pop().toLowerCase();
                                     if (ext === 'blp') {
-                                        html += ` <a class="btn-preview" onclick="openPreview('${row.P}', '${row.N}')">👁️ Preview</a>`;
+                                        html += ` <a class="btn-preview" onclick="openPreview('${fullFileUrl}', '${row.N}')">👁️ Preview</a>`;
                                     }
                                     return html;
                                 }
@@ -243,13 +246,13 @@ $(document).ready(function() {
     xhr.send();
 });
 
-function openPreview(filePath, fileName) {
+function openPreview(fileUrl, fileName) {
     $('#previewModal').show();
     $('#modalTitle').text(fileName);
     $('#modalLoading').show();
     $('#canvasContainer').empty();
 
-    fetch(filePath)
+    fetch(fileUrl)
         .then(res => res.arrayBuffer())
         .then(buffer => {
             $('#modalLoading').hide();
