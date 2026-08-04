@@ -2,7 +2,354 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WoW 3.3.5a File Browser</title>
+    
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; background-color: #f6f8fa; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+        h1 { border-bottom: 1px solid #eaecef; padding-bottom: 10px; margin-top: 0; }
+        a { color: #0366d6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .path-muted { color: #6a737d; font-size: 0.9em; }
+
+        /* Controls / Filter Bar */
+        .filter-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            background: #f1f8ff;
+            padding: 10px 15px;
+            border-radius: 6px;
+            border: 1px solid #c8e1ff;
+        }
+        .filter-toolbar label { font-weight: bold; color: #0366d6; }
+        .filter-toolbar select {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: white;
+            font-size: 0.95em;
+            cursor: pointer;
+        }
+
+        .btn-preview {
+            background-color: #28a745; color: white !important;
+            padding: 2px 8px; border-radius: 4px; font-size: 0.8em;
+            margin-left: 8px; cursor: pointer; display: inline-block;
+        }
+        .btn-preview:hover { background-color: #218838; text-decoration: none !important; }
+
+        .modal {
+            display: none; position: fixed; z-index: 9999;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.8);
+        }
+        .modal-content {
+            background-color: #fff; margin: 5% auto; padding: 20px;
+            border-radius: 8px; width: 600px; max-width: 90%;
+            text-align: center; position: relative;
+        }
+        .close-btn {
+            position: absolute; right: 15px; top: 10px;
+            font-size: 24px; font-weight: bold; cursor: pointer; color: #aaa;
+        }
+        .close-btn:hover { color: #000; }
+        #canvasContainer {
+            width: 100%; min-height: 250px; background: #1e1e1e;
+            display: flex; justify-content: center; align-items: center;
+            border-radius: 4px; overflow: hidden; margin-top: 10px; padding: 10px;
+        }
+        canvas { max-width: 100%; max-height: 500px; }
+
+        #progressContainer { margin-bottom: 20px; padding: 15px; background: #f1f8ff; border: 1px solid #c8e1ff; border-radius: 6px; }
+        #statusText { font-weight: bold; color: #0366d6; margin-bottom: 8px; }
+        .progress-bar-bg { width: 100%; background-color: #e1e4e8; border-radius: 4px; overflow: hidden; height: 18px; }
+        .progress-bar-fill { width: 0%; height: 100%; background-color: #28a745; transition: width 0.1s ease; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Index of /World of Warcraft (3.3.5a)</h1>
+    
+    <div id="progressContainer">
+        <div id="statusText">Connecting to index...</div>
+        <div class="progress-bar-bg"><div id="progressBar" class="progress-bar-fill"></div></div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-toolbar" id="toolbar" style="display: none;">
+        <label for="extensionFilter">File Type Filter:</label>
+        <select id="extensionFilter">
+            <option value="">All Extensions (Show Everything)</option>
+        </select>
+    </div>
+
+    <table id="fileTable" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>File Name</th>
+                <th>Folder Path</th>
+                <th>Size</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<div id="previewModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <h3 id="modalTitle">Texture Preview</h3>
+        <div id="modalLoading" style="color: #666;">Decoding BLP...</div>
+        <div id="canvasContainer"></div>
+    </div>
+</div>
+
+<script>
+const RAW_REPO_URL = 'https://raw.githubusercontent.com/Elwynsiaa/legendary-memory/main/';
+let dataTableInstance = null;
+
+// BLP Decoder
+class BLPDecoder {
+    static parse(buffer) {
+        const u32 = new Uint32Array(buffer, 0, 20);
+        const u8 = new Uint8Array(buffer);
+        const type = u32[1], encoding = u8[8], width = u32[3], height = u32[4], offset = u32[5], length = u32[21];
+        const mipData = new Uint8Array(buffer, offset, length);
+        const canvasData = new Uint8ClampedArray(width * height * 4);
+
+        if (type === 1) {
+            if (encoding === 1) this.decodeDXT1(mipData, width, height, canvasData);
+            else if (encoding === 2 || encoding === 3) this.decodeDXT5(mipData, width, height, canvasData, encoding === 2);
+            else if (encoding === 7) {
+                for (let i = 0; i < width * height; i++) {
+                    const idx = i * 4;
+                    canvasData[idx] = mipData[idx + 2];
+                    canvasData[idx + 1] = mipData[idx + 1];
+                    canvasData[idx + 2] = mipData[idx];
+                    canvasData[idx + 3] = mipData[idx + 3];
+                }
+            }
+        }
+        return { width, height, data: canvasData };
+    }
+
+    static decodeDXT1(src, width, height, dst) {
+        let srcOff = 0;
+        const blockW = (width + 3) >> 2, blockH = (height + 3) >> 2;
+        for (let by = 0; by < blockH; by++) {
+            for (let bx = 0; bx < blockW; bx++) {
+                const c0 = src[srcOff] | (src[srcOff + 1] << 8), c1 = src[srcOff + 2] | (src[srcOff + 3] << 8);
+                srcOff += 4;
+                const r0 = ((c0 >> 11) & 0x1f) * 8, g0 = ((c0 >> 5) & 0x3f) * 4, b0 = (c0 & 0x1f) * 8;
+                const r1 = ((c1 >> 11) & 0x1f) * 8, g1 = ((c1 >> 5) & 0x3f) * 4, b1 = (c1 & 0x1f) * 8;
+                const codeTable = src[srcOff] | (src[srcOff + 1] << 8) | (src[srcOff + 2] << 16) | (src[srcOff + 3] << 24);
+                srcOff += 4;
+                for (let py = 0; py < 4; py++) {
+                    const y = (by << 2) + py; if (y >= height) break;
+                    for (let px = 0; px < 4; px++) {
+                        const x = (bx << 2) + px; if (x >= width) break;
+                        const code = (codeTable >> (2 * ((py << 2) + px))) & 0x03;
+                        let r = 0, g = 0, b = 0, a = 255;
+                        if (code === 0) { r = r0; g = g0; b = b0; }
+                        else if (code === 1) { r = r1; g = g1; b = b1; }
+                        else if (c0 > c1) {
+                            if (code === 2) { r = (2 * r0 + r1) / 3; g = (2 * g0 + g1) / 3; b = (2 * b0 + b1) / 3; }
+                            else { r = (r0 + 2 * r1) / 3; g = (g0 + 2 * g1) / 3; b = (b0 + 2 * b1) / 3; }
+                        } else {
+                            if (code === 2) { r = (r0 + r1) >> 1; g = (g0 + g1) >> 1; b = (b0 + b1) >> 1; }
+                            else { a = 0; }
+                        }
+                        const dstIdx = (y * width + x) << 2;
+                        dst[dstIdx] = r; dst[dstIdx + 1] = g; dst[dstIdx + 2] = b; dst[dstIdx + 3] = a;
+                    }
+                }
+            }
+        }
+    }
+
+    static decodeDXT5(src, width, height, dst, isDxt3 = false) {
+        let srcOff = 0;
+        const blockW = (width + 3) >> 2, blockH = (height + 3) >> 2;
+        for (let by = 0; by < blockH; by++) {
+            for (let bx = 0; bx < blockW; bx++) {
+                const alphaBlockOff = srcOff, a0 = src[srcOff], a1 = src[srcOff + 1];
+                const g0 = src[srcOff + 2] | (src[srcOff + 3] << 8) | (src[srcOff + 4] << 16);
+                const g1 = src[srcOff + 5] | (src[srcOff + 6] << 8) | (src[srcOff + 7] << 16);
+                srcOff += 8;
+                const c0 = src[srcOff] | (src[srcOff + 1] << 8), c1 = src[srcOff + 2] | (src[srcOff + 3] << 8);
+                srcOff += 4;
+                const r0 = ((c0 >> 11) & 0x1f) * 8, g0Color = ((c0 >> 5) & 0x3f) * 4, b0 = (c0 & 0x1f) * 8;
+                const r1 = ((c1 >> 11) & 0x1f) * 8, g1Color = ((c1 >> 5) & 0x3f) * 4, b1 = (c1 & 0x1f) * 8;
+                const codeTable = src[srcOff] | (src[srcOff + 1] << 8) | (src[srcOff + 2] << 16) | (src[srcOff + 3] << 24);
+                srcOff += 4;
+                for (let py = 0; py < 4; py++) {
+                    const y = (by << 2) + py; if (y >= height) break;
+                    for (let px = 0; px < 4; px++) {
+                        const x = (bx << 2) + px; if (x >= width) break;
+                        const bitIdx = (py << 2) + px;
+                        const code = (codeTable >> (2 * bitIdx)) & 0x03;
+                        let r = 0, g = 0, b = 0;
+                        if (code === 0) { r = r0; g = g0Color; b = b0; }
+                        else if (code === 1) { r = r1; g = g1Color; b = b1; }
+                        else if (code === 2) { r = (2 * r0 + r1) / 3; g = (2 * g0Color + g1Color) / 3; b = (2 * b0 + b1) / 3; }
+                        else { r = (r0 + 2 * r1) / 3; g = (g0Color + 2 * g1Color) / 3; b = (b0 + 2 * b1) / 3; }
+                        let a = 255;
+                        if (isDxt3) {
+                            a = ((src[alphaBlockOff + (bitIdx >> 1)] >> ((bitIdx & 1) << 2)) & 0x0f) * 17;
+                        } else {
+                            const codeA = bitIdx < 8 ? (g0 >> (3 * bitIdx)) & 7 : (g1 >> (3 * (bitIdx - 8))) & 7;
+                            if (codeA === 0) a = a0;
+                            else if (codeA === 1) a = a1;
+                            else if (a0 > a1) a = ((8 - codeA) * a0 + (codeA - 1) * a1) / 7;
+                            else {
+                                if (codeA === 6) a = 0;
+                                else if (codeA === 7) a = 255;
+                                else a = ((6 - codeA) * a0 + (codeA - 1) * a1) / 5;
+                            }
+                        }
+                        const dstIdx = (y * width + x) << 2;
+                        dst[dstIdx] = r; dst[dstIdx + 1] = g; dst[dstIdx + 2] = b; dst[dstIdx + 3] = a;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Custom DataTables Filter for Extensions
+$.fn.dataTable.ext.search.push(
+    function( settings, data, dataIndex, rowData ) {
+        var selectedExt = $('#extensionFilter').val().toLowerCase();
+        if (!selectedExt) return true; // Show all if nothing selected
+
+        var fileName = rowData.N || '';
+        var parts = fileName.split('.');
+        if (parts.length <= 1) return false;
+        
+        var ext = parts.pop().toLowerCase();
+        return ext === selectedExt;
+    }
+);
+
+$(document).ready(function() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'file-index.json', true);
+
+    xhr.onprogress = function(e) {
+        if (e.lengthComputable) {
+            var percent = Math.round((e.loaded / e.total) * 100);
+            $('#progressBar').css('width', percent + '%');
+            $('#statusText').text('Downloading file index... ' + percent + '%');
+        }
+    };
+
+    xhr.onload = function() {
+        if (xhr.status === 200) {
+            $('#statusText').text('Parsing file list & building extension list...');
+            setTimeout(function() {
+                var jsonData = JSON.parse(xhr.responseText);
+
+                // Auto-detect all unique extensions in the repository
+                let extensions = new Set();
+                jsonData.forEach(item => {
+                    let parts = item.N.split('.');
+                    if (parts.length > 1) {
+                        extensions.add(parts.pop().toLowerCase());
+                    }
+                });
+
+                // Populate the dropdown list alphabetically
+                let $select = $('#extensionFilter');
+                Array.from(extensions).sort().forEach(ext => {
+                    $select.append(`<option value="${ext}">.${ext}</option>`);
+                });
+
+                $('#toolbar').show();
+
+                $('#progressContainer').fadeOut(300, function() {
+                    dataTableInstance = $('#fileTable').DataTable({
+                        "data": jsonData,
+                        "columns": [
+                            { 
+                                "data": null,
+                                "render": function ( data, type, row ) {
+                                    let fullFileUrl = RAW_REPO_URL + row.P;
+                                    let html = '<a href="' + fullFileUrl + '" target="_blank">' + row.N + '</a>';
+                                    let ext = row.N.split('.').pop().toLowerCase();
+                                    if (ext === 'blp') {
+                                        html += ` <a class="btn-preview" onclick="openPreview('${fullFileUrl}', '${row.N}')">👁️ Preview</a>`;
+                                    }
+                                    return html;
+                                }
+                            },
+                            { 
+                                "data": "P",
+                                "render": function( data, type, row ) {
+                                    return '<span class="path-muted">' + data.replace(row.N, '') + '</span>';
+                                }
+                            },
+                            { "data": "S" }
+                        ],
+                        "deferRender": true,
+                        "pageLength": 50,
+                        "order": [[ 1, "asc" ]]
+                    });
+
+                    // Trigger table refresh when dropdown changes
+                    $('#extensionFilter').on('change', function() {
+                        dataTableInstance.draw();
+                    });
+                });
+            }, 50);
+        }
+    };
+    xhr.send();
+});
+
+function openPreview(fileUrl, fileName) {
+    $('#previewModal').show();
+    $('#modalTitle').text(fileName);
+    $('#modalLoading').show();
+    $('#canvasContainer').empty();
+
+    fetch(fileUrl)
+        .then(res => res.arrayBuffer())
+        .then(buffer => {
+            $('#modalLoading').hide();
+            const blp = BLPDecoder.parse(buffer);
+            const canvas = document.createElement('canvas');
+            canvas.width = blp.width; canvas.height = blp.height;
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.createImageData(blp.width, blp.height);
+            imgData.data.set(blp.data);
+            ctx.putImageData(imgData, 0, 0);
+            $('#canvasContainer').append(canvas);
+        })
+        .catch(err => {
+            $('#modalLoading').text('Failed to decode BLP texture.').css('color', 'red');
+        });
+}
+
+function closeModal() {
+    $('#previewModal').hide();
+    $('#canvasContainer').empty();
+}
+</script>
+
+</body>
+</html>
     <title>WoW 3.3.5a File Browser</title>
     
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
