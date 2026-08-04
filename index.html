@@ -18,6 +18,16 @@
         a:hover { text-decoration: underline; }
         .path-muted { color: #6a737d; font-size: 0.9em; }
 
+        /* Prevent text wrapping on rows and fix size column formatting */
+        #fileTable td { white-space: nowrap; }
+        #fileTable th:nth-child(3), 
+        #fileTable td:nth-child(3) { 
+            text-align: right; 
+            width: 110px; 
+            white-space: nowrap; 
+            padding-right: 15px;
+        }
+
         /* Filter Toolbar */
         .filter-toolbar {
             display: flex;
@@ -124,11 +134,9 @@
 </div>
 
 <script>
-// Base raw URL for fetching binary files
 const RAW_REPO_URL = 'https://raw.githubusercontent.com/Elwynsiaa/wow-3.3.5a-asset-explorer/main/';
 let dataTableInstance = null;
 
-// Native BLP Texture Decoder
 class BLPDecoder {
     static parse(buffer) {
         const u32 = new Uint32Array(buffer, 0, 20);
@@ -236,7 +244,6 @@ class BLPDecoder {
     }
 }
 
-// DataTables Custom Extension Filter
 $.fn.dataTable.ext.search.push(
     function( settings, data, dataIndex, rowData ) {
         var selectedExt = $('#extensionFilter').val();
@@ -295,12 +302,9 @@ $(document).ready(function() {
                                     let html = '<a href="' + fullFileUrl + '" target="_blank">' + row.N + '</a>';
                                     let ext = row.N.split('.').pop().toLowerCase();
                                     
-                                    // BLP Preview Button
                                     if (ext === 'blp') {
                                         html += ` <a class="btn-preview" onclick="openPreview('${fullFileUrl}', '${row.N}', 'blp')">👁️ Preview</a>`;
-                                    } 
-                                    // Audio Listen Button (WAV, MP3, OGG)
-                                    else if (ext === 'wav' || ext === 'mp3' || ext === 'ogg') {
+                                    } else if (ext === 'wav' || ext === 'mp3' || ext === 'ogg') {
                                         html += ` <a class="btn-preview btn-audio" onclick="openPreview('${fullFileUrl}', '${row.N}', 'audio')">▶️ Listen</a>`;
                                     }
                                     return html;
@@ -329,7 +333,6 @@ $(document).ready(function() {
     xhr.send();
 });
 
-// Modal Controller for Both Textures and Audio
 function openPreview(fileUrl, fileName, type) {
     $('#previewModal').show();
     $('#modalTitle').text(fileName);
@@ -355,8 +358,6 @@ function openPreview(fileUrl, fileName, type) {
             });
     } else if (type === 'audio') {
         $('#modalLoading').hide();
-        
-        // HTML5 Audio Player
         const audioPlayer = `<audio controls autoplay>
                                 <source src="${fileUrl}">
                                 Your browser does not support the audio element.
@@ -365,11 +366,8 @@ function openPreview(fileUrl, fileName, type) {
     }
 }
 
-// Close Modal & Stop Audio Playback
 function closeModal() {
     $('#previewModal').hide();
-    
-    // Stop playing audio when modal is closed
     $('#canvasContainer find("audio")').each(function() {
         this.pause();
     });
